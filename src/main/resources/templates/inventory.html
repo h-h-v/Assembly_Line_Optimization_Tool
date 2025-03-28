@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map View of Factory Locations</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        #map {
+            height: 100vh; /* Full height */
+            width: 100%;
+            position: relative;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000; /* Ensure controls are above the map */
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #1f1f1f;
+            color: #ffffff;
+        }
+        button {
+            background-color: #1f1f1f;
+            color: #ffffff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+            color: #ffffff;
+        }
+        th {
+            background-color: #1f1f1f;
+        }
+        tr:hover {
+            background-color: #333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <input type="text" id="searchInput" placeholder="Search by state or name..." onkeyup="filterInventory()">
+    <button onclick="filterInventory()">Filter</button>
+</div>
+
+<div id="map"></div>
+
+<p id="prediction"></p>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    // Initialize the map
+    const map = L.map('map').setView([20.5937, 78.9629], 5); // Centered over India
+
+    // Add a dark tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    }).addTo(map);
+
+    // Sample data from inventory
+    const inventoryList = [
+    // India
+    { state: 'chennai', country: 'India', name: 'f1', production: 40, size: 16000, machine_count: 60, coords: [13.0827, 80.2707] },
+    { state: 'mumbai', country: 'India', name: 'f2', production: 75, size: 16000, machine_count: 53, coords: [19.0760, 72.8777] },
+    { state: 'delhi', country: 'India', name: 'f3', production: 105, size: 17000, machine_count: 90, coords: [28.6139, 77.2090] },
+    { state: 'bangalore', country: 'India', name: 'f4', production: 95, size: 16500, machine_count: 78, coords: [12.9716, 77.5946] },
+
+    // USA
+    { state: 'california', country: 'USA', name: 'f5', production: 120, size: 18000, machine_count: 110, coords: [36.7783, -119.4179] },
+    { state: 'texas', country: 'USA', name: 'f6', production: 110, size: 17500, machine_count: 105, coords: [31.9686, -99.9018] },
+    { state: 'new york', country: 'USA', name: 'f7', production: 130, size: 18500, machine_count: 115, coords: [40.7128, -74.0060] },
+
+    // UK
+    { state: 'london', country: 'UK', name: 'f8', production: 90, size: 17000, machine_count: 85, coords: [51.5074, -0.1278] },
+    { state: 'manchester', country: 'UK', name: 'f9', production: 80, size: 16500, machine_count: 77, coords: [53.4839, -2.2446] },
+
+    // Germany
+    { state: 'berlin', country: 'Germany', name: 'f10', production: 115, size: 19000, machine_count: 120, coords: [52.5200, 13.4050] },
+    { state: 'munich', country: 'Germany', name: 'f11', production: 100, size: 18000, machine_count: 98, coords: [48.1351, 11.5820] },
+
+    // China
+    { state: 'shanghai', country: 'China', name: 'f12', production: 140, size: 20000, machine_count: 130, coords: [31.2304, 121.4737] },
+    { state: 'beijing', country: 'China', name: 'f13', production: 135, size: 19500, machine_count: 125, coords: [39.9042, 116.4074] },
+
+    // Japan
+    { state: 'tokyo', country: 'Japan', name: 'f14', production: 125, size: 19000, machine_count: 115, coords: [35.6895, 139.6917] },
+    { state: 'osaka', country: 'Japan', name: 'f15', production: 105, size: 18000, machine_count: 95, coords: [34.6937, 135.5023] },
+
+    // Canada
+    { state: 'toronto', country: 'Canada', name: 'f16', production: 100, size: 17500, machine_count: 90, coords: [43.6510, -79.3470] },
+    { state: 'vancouver', country: 'Canada', name: 'f17', production: 90, size: 17000, machine_count: 85, coords: [49.2827, -123.1207] },
+
+    // France
+    { state: 'paris', country: 'France', name: 'f18', production: 110, size: 18500, machine_count: 100, coords: [48.8566, 2.3522] },
+    { state: 'lyon', country: 'France', name: 'f19', production: 95, size: 17500, machine_count: 88, coords: [45.7640, 4.8357] },
+
+    // Brazil
+    { state: 'sao paulo', country: 'Brazil', name: 'f20', production: 120, size: 19000, machine_count: 110, coords: [-23.5505, -46.6333] },
+    { state: 'rio de janeiro', country: 'Brazil', name: 'f21', production: 105, size: 18000, machine_count: 95, coords: [-22.9068, -43.1729] },
+
+    // Australia
+    { state: 'sydney', country: 'Australia', name: 'f22', production: 115, size: 18500, machine_count: 105, coords: [-33.8688, 151.2093] },
+    { state: 'melbourne', country: 'Australia', name: 'f23', production: 105, size: 18000, machine_count: 95, coords: [-37.8136, 144.9631] },
+
+    // South Africa
+    { state: 'johannesburg', country: 'South Africa', name: 'f24', production: 90, size: 17000, machine_count: 80, coords: [-26.2041, 28.0473] },
+    { state: 'cape town', country: 'South Africa', name: 'f25', production: 85, size: 16500, machine_count: 75, coords: [-33.9249, 18.4241] }
+];
+
+    // Add markers for each factory location
+    inventoryList.forEach(item => {
+        let color;
+        if (item.production > 100) {
+            color = 'green';
+        } else if (item.production >= 50) {
+            color = 'orange';
+        } else {
+            color = 'red';
+        }
+
+        const marker = L.circleMarker(item.coords, {
+            radius: 8,
+            fillColor: color,
+            color: color,
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(map);
+        
+        // Create buttons for the popup
+        const viewButton = `<button onclick="fetchFailurePrediction(this)" 
+            data-state="${item.state}" 
+            data-machine_count="${item.machine_count}" 
+            data-size="${item.size}" 
+            data-production="${item.production}">View</button>`;
+        
+        const predictButton = `<button onclick="sendToMLModel(this)" 
+            data-state="${item.state}" 
+            data-machine_count="${item.machine_count}" 
+            data-size="${item.size}" 
+            data-production="${item.production}">Predict</button>`;
+        
+        marker.bindPopup(`<b>${item.name}</b><br>State: ${item.state}<br>Production: ${item.production}<br>Machine Count: ${item.machine_count}<br>${viewButton} ${predictButton}`);
+    });
+
+    async function sendToMLModel(button) {
+        const state = button.getAttribute('data-state');
+        const machine_count = button.getAttribute('data-machine_count');
+        const size = button.getAttribute('data-size');
+        const production = button.getAttribute('data-production');
+
+        const requestData = {
+            state_encoded: encodeState(state), // Ensure encoding happens
+            machine_count: parseFloat(machine_count),
+            size: parseFloat(size),
+            production: parseFloat(production)
+        };
+
+        console.log("Sending data:", requestData);
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+            console.log("Received result:", result);
+
+            if (result.predicted_error !== undefined) {
+                document.getElementById('prediction').innerText = `Prediction: ${result.predicted_error}`;
+            } else {
+                document.getElementById('prediction').innerText = "Prediction: Error receiving data";
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            document.getElementById('prediction').innerText = "Prediction: Error";
+        }
+    }
+
+    // Function to encode state (Replace this with actual encoding logic)
+    function encodeState(state) {
+        const stateEncoding = {
+            "chennai": 0,
+            "coimbatore": 1,
+            "delhi": 2,
+            "mumbai": 3
+        };
+        return stateEncoding[state] ?? -1; // Return -1 if state not found
+    }
+
+    async function fetchFailurePrediction(button) {
+        const state = button.getAttribute('data-state');
+        const machine_count = parseInt(button.getAttribute('data-machine_count'), 10);
+        const size = parseFloat(button.getAttribute('data-size'));
+        const production = parseFloat(button.getAttribute('data-production'));
+
+        const requestData = {
+            state: state,  // Ensure state is sent as a string
+            machine_count: machine_count,
+            size: size,
+            production: production
+        };
+
+        console.log("🔍 Sending failure prediction request:", requestData);
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/predict_failure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+            console.log("✅ Received failure prediction:", result);
+
+            if (result.predicted_failure !== undefined) {
+                // Redirect with correct query parameter
+                window.location.href = `/view?state=${encodeURIComponent(state)}&failureRate=${result.predicted_failure}`;
+            } else {
+                alert("⚠️ Error: No failure prediction received.");
+            }
+        } catch (error) {
+            console.error("❌ Error fetching failure prediction:", error);
+            alert("⚠️ Error fetching failure prediction.");
+        }
+    }
+
+    function filterInventory() {
+        const searchInput = document.getElementById('searchInput').value.toLowerCase();
+        const filteredInventory = inventoryList.filter(item => {
+            return item.state.toLowerCase().includes(searchInput) || item.name.toLowerCase().includes(searchInput);
+        });
+
+        // Clear existing markers
+        map.eachLayer(function (layer) {
+            if (layer instanceof L.CircleMarker) {
+                map.removeLayer(layer);
+            }
+        });
+
+        // Add filtered markers
+        filteredInventory.forEach(item => {
+            let color;
+            if (item.production > 100) {
+                color = 'green';
+            } else if (item.production >= 50) {
+                color = 'orange';
+            } else {
+                color = 'red';
+            }
+
+            const marker = L.circleMarker(item.coords, {
+                radius: 8,
+                fillColor: color,
+                color: color,
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            // Create buttons for the popup
+            const viewButton = `<button onclick="fetchFailurePrediction(this)" 
+                data-state="${item.state}" 
+                data-machine_count="${item.machine_count}" 
+                data-size="${item.size}" 
+                data-production="${item.production}">View</button>`;
+            
+            const predictButton = `<button onclick="sendToMLModel(this)" 
+                data-state="${item.state}" 
+                data-machine_count="${item.machine_count}" 
+                data-size="${item.size}" 
+                data-production="${item.production}">Predict</button>`;
+            
+            marker.bindPopup(`<b>${item.name}</b><br>State: ${item.state}<br>Production: ${item.production}<br>Machine Count: ${item.machine_count}<br>${viewButton} ${predictButton}`);
+        });
+    }
+</script>
+
+</body>
+</html>

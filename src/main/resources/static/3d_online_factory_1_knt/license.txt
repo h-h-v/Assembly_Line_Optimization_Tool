@@ -1,0 +1,8 @@
+Model Information:
+* title:	3D Online Factory 1 KNT
+* source:	https://sketchfab.com/3d-models/3d-online-factory-1-knt-c03238ccd05e43049e04857339cdb8b4
+* author:	Jirayu IT (https://sketchfab.com/jirayu2)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works
